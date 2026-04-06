@@ -1,0 +1,43 @@
+site_name: fastmcp-guard
+site_description: Production operations layer for FastMCP servers
+site_url: https://fastmcp-guard.readthedocs.io
+repo_url: https://github.com/rohan/fastmcp-guard
+repo_name: rohan/fastmcp-guard
+
+theme:
+  name: material
+  palette:
+    scheme: slate
+    primary: deep purple
+    accent: purple
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - content.code.copy
+    - content.code.annotate
+
+nav:
+  - Home: index.md
+  - Quickstart: quickstart.md
+  - Guides:
+    - API Keys: keys.md
+    - Rate Limiting: rate-limiting.md
+    - Audit Logging: audit.md
+    - IP Policy: ip-policy.md
+    - Backends: backends.md
+  - CLI Reference: cli.md
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [../src]
+
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.superfences
+  - admonition
+  - tables

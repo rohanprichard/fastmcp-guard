@@ -1,0 +1,18 @@
+"""fastmcp-guard: Production operations layer for FastMCP servers."""
+
+from fastmcp_guard.guard import Guard
+from fastmcp_guard.keys.store import KeyStore
+from fastmcp_guard.keys.models import APIKey
+from fastmcp_guard.rate.limiter import RateLimit
+from fastmcp_guard.audit.log import AuditLog
+from fastmcp_guard.ip.policy import IPPolicy
+
+__version__ = "0.1.0"
+__all__ = [
+    "Guard",
+    "KeyStore",
+    "APIKey",
+    "RateLimit",
+    "AuditLog",
+    "IPPolicy",
+]
