@@ -1,6 +1,6 @@
 # Contributing to fastmcp-guard
 
-Thanks for your interest! This is a young project and contributions are very welcome.
+Thanks for your interest! This is a young project and contributions are very welcome. You are free to use any AI tools during development, however, should be able to explain your changes correctly in the PR.
 
 ## Setup
 

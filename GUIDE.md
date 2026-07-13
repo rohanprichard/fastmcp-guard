@@ -299,10 +299,12 @@ s = KeyStore(backend="sqlite", path="keys.db")
 - ✅ Set `log_inputs=False` / `log_outputs=False` if tool args/outputs can
   contain secrets or PII.
 - ✅ Rotate keys on a schedule with a grace window; revoke on suspected leak.
+- ✅ Authentication is non-blocking: the bcrypt check runs in a worker thread,
+  so it never stalls the event loop (concurrent auths run in parallel).
 - ⚠️ Rate limiting is per-process. If you run multiple workers, each has its own
   window (a single worker, or the future Redis backend, gives a global limit).
-- ⚠️ This is beta software (v0.2). It's tested end-to-end but young — pin the
-  version and test in your own harness.
+- ⚠️ This is beta software. It's tested end-to-end but young — pin the version
+  and test in your own harness.
 
 ---
 

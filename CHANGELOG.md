@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.2.1
+
+### Changed
+- **Authentication no longer blocks the event loop.** `verify_token` runs the
+  blocking key lookup + bcrypt comparison in a worker thread
+  (`asyncio.to_thread`). bcrypt releases the GIL, so concurrent verifications
+  run in parallel instead of serializing the server.
+- Version is single-sourced from `__init__.py` (hatch dynamic version).
+
+### Fixed
+- SQLite backends leaked connections — `with sqlite3.connect(...)` commits but
+  does not close. Connections are now wrapped in `contextlib.closing`.
+
+### Internal
+- `mypy --strict` now passes across the package; CI runs ruff + mypy + pytest.
+- Added a PyPI publishing workflow (Trusted Publishing / OIDC) and `RELEASING.md`.
+- Added a runnable server/client demo under `examples/demo/`; removed the
+  outdated walkthrough POC.
+
 ## 0.2.0
 
 First functional release. Every feature is now wired into the request path and
