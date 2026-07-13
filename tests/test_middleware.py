@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 from fastmcp import Client, FastMCP
 from fastmcp.exceptions import ToolError
+from fastmcp.server.auth import TokenVerifier
 
 from fastmcp_guard import AuditLog, Guard, IPPolicy, RateLimit
 from fastmcp_guard.middleware import GuardMiddleware
@@ -128,3 +129,39 @@ async def test_ip_policy_allows_permitted(monkeypatch) -> None:
     mw = GuardMiddleware(ip=IPPolicy(allow=["10.0.0.0/8"]))
     monkeypatch.setattr(GuardMiddleware, "_client_ip", staticmethod(lambda: "10.0.0.5"))
     assert await mw.on_call_tool(_Ctx(), _call_next) == "ok"
+
+
+# -- auth composition (compose with external OAuth/JWT) -----------------------
+
+
+class _ExternalVerifier(TokenVerifier):
+    async def verify_token(self, token):  # noqa: ANN001, ANN201
+        return None
+
+
+def test_installs_key_verifier_when_no_auth() -> None:
+    from fastmcp_guard.keys.verifier import KeyStoreVerifier
+
+    mcp = FastMCP("x")
+    Guard(mcp)
+    assert isinstance(mcp.auth, KeyStoreVerifier)
+
+
+def test_preserves_existing_auth_by_default() -> None:
+    mcp = FastMCP("x", auth=_ExternalVerifier())
+    Guard(mcp)  # manage_auth=None -> don't clobber existing auth
+    assert isinstance(mcp.auth, _ExternalVerifier)
+
+
+def test_manage_auth_false_never_touches_auth() -> None:
+    mcp = FastMCP("x", auth=_ExternalVerifier())
+    Guard(mcp, manage_auth=False)
+    assert isinstance(mcp.auth, _ExternalVerifier)
+
+
+def test_manage_auth_true_overrides() -> None:
+    from fastmcp_guard.keys.verifier import KeyStoreVerifier
+
+    mcp = FastMCP("x", auth=_ExternalVerifier())
+    Guard(mcp, manage_auth=True)
+    assert isinstance(mcp.auth, KeyStoreVerifier)

@@ -60,18 +60,34 @@ class Guard:
         rate_limit: RateLimit | None = None,
         audit: AuditLog | None = None,
         ip: IPPolicy | None = None,
+        manage_auth: bool | None = None,
     ) -> None:
         self._mcp = mcp
         self.keys: KeyStore = keys or KeyStore(backend="memory")
         self._rate_limit = rate_limit
         self._audit = audit
         self._ip = ip
+        self._manage_auth = manage_auth
 
         self._install()
 
     def _install(self) -> None:
-        """Install auth (token verification) and the ops middleware."""
-        self._mcp.auth = KeyStoreVerifier(key_store=self.keys)
+        """Install auth (token verification) and the ops middleware.
+
+        Whether fastmcp-guard manages authentication is controlled by
+        ``manage_auth``:
+
+        - ``True``: always install the API-key ``TokenVerifier``.
+        - ``False``: never touch ``mcp.auth`` — use this to layer audit / rate
+          limiting / IP policy on top of your own OAuth or JWT auth. The audit
+          and rate-limit features attribute calls to whatever access token your
+          existing auth produces.
+        - ``None`` (default): install the API-key verifier only if the server
+          has no auth configured yet, so an existing OAuth/JWT setup is
+          preserved.
+        """
+        if self._should_manage_auth():
+            self._mcp.auth = KeyStoreVerifier(key_store=self.keys)
         self._mcp.add_middleware(
             GuardMiddleware(
                 rate_limit=self._rate_limit,
@@ -79,3 +95,8 @@ class Guard:
                 ip=self._ip,
             )
         )
+
+    def _should_manage_auth(self) -> bool:
+        if self._manage_auth is not None:
+            return self._manage_auth
+        return getattr(self._mcp, "auth", None) is None

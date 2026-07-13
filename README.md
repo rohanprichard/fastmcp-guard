@@ -270,6 +270,32 @@ fastmcp-guard response interceptor
 
 ---
 
+## Using with OAuth / JWT
+
+fastmcp-guard is not an OAuth server, and it doesn't try to be — under the MCP
+authorization spec your server is an OAuth 2.1 *resource server* that validates
+externally-issued tokens, and FastMCP already ships `JWTVerifier`, `OAuthProxy`,
+and `RemoteAuthProvider` for exactly that.
+
+Instead, fastmcp-guard **composes** with whatever auth you use. Its audit, rate
+limiting, and IP policy read identity from the access token FastMCP produces, so
+they work on top of OAuth or JWT just as well as on top of API keys:
+
+```python
+mcp = FastMCP("my-server", auth=JWTVerifier(...))  # your existing OAuth/JWT
+
+# Add ops controls without touching your auth:
+Guard(mcp, rate_limit=RateLimit(per_key="100/minute"),
+      audit=AuditLog(backend="file", path="audit.jsonl"),
+      manage_auth=False)
+```
+
+By default (`manage_auth=None`) fastmcp-guard installs its API-key verifier only
+if the server has no auth configured, so an existing OAuth setup is preserved.
+Set `manage_auth=False` to be explicit, or `True` to force API-key auth.
+
+---
+
 ## Key store backends
 
 | Backend | Use case | Install | Status |
