@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
-from typing import Literal
+from typing import Any, Literal
 
+from fastmcp_guard.keys.backends.base import KeyBackend
 from fastmcp_guard.keys.models import (
     APIKey,
     KeyStatus,
@@ -53,7 +54,7 @@ class KeyStore:
         self._dsn = dsn
         self._backend = self._init_backend()
 
-    def _init_backend(self):
+    def _init_backend(self) -> KeyBackend:
         if self.backend == "memory":
             from fastmcp_guard.keys.backends.memory import MemoryKeyBackend
 
@@ -72,7 +73,7 @@ class KeyStore:
         name: str,
         scopes: list[str] | None = None,
         expires_in_days: int | None = None,
-        metadata: dict | None = None,
+        metadata: dict[str, Any] | None = None,
     ) -> APIKey:
         """Create a new API key.
 

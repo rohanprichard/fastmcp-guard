@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import contextlib
 import time
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
 from fastmcp.server.middleware import Middleware
 
@@ -30,6 +30,7 @@ if TYPE_CHECKING:
     from fastmcp_guard.ip.policy import IPPolicy
 
 _ANON = "anonymous"
+AuditStatus = Literal["ok", "error", "rate_limited", "unauthorized"]
 
 
 def _output_preview(result: Any, limit: int = 200) -> str | None:
@@ -75,7 +76,7 @@ class GuardMiddleware(Middleware):
     # -- identity / context helpers -----------------------------------------
 
     @staticmethod
-    def _identity() -> tuple[str, str, list[str], dict]:
+    def _identity() -> tuple[str, str, list[str], dict[str, Any]]:
         """Return (key_id, key_name, scopes, metadata) for the caller."""
         try:
             from fastmcp.server.dependencies import get_access_token
@@ -110,10 +111,14 @@ class GuardMiddleware(Middleware):
         self, context: MiddlewareContext, tool_name: str
     ) -> str | None:
         """Read a per-tool ``@rate_limit`` marker, if any."""
+        ctx = context.fastmcp_context
+        if ctx is None:
+            return None
         try:
-            server = context.fastmcp_context.fastmcp
-            tool = await server.get_tool(tool_name)
-            return getattr(tool.fn, RATE_LIMIT_ATTR, None)
+            tool = await ctx.fastmcp.get_tool(tool_name)
+            fn = getattr(tool, "fn", None)
+            marker = getattr(fn, RATE_LIMIT_ATTR, None)
+            return marker if isinstance(marker, str) else None
         except Exception:
             return None
 
@@ -146,8 +151,8 @@ class GuardMiddleware(Middleware):
         client_ip = self._client_ip()
         rate_id = key_id or _ANON
 
-        def record(status: str, duration_ms: float = 0.0, error: str | None = None,
-                   output: Any = None) -> AuditRecord:
+        def record(status: AuditStatus, duration_ms: float = 0.0,
+                   error: str | None = None, output: Any = None) -> AuditRecord:
             return AuditRecord(
                 key_id=key_id, key_name=key_name, tool=tool_name, scopes=scopes,
                 duration_ms=duration_ms, status=status, error=error,
@@ -180,7 +185,9 @@ class GuardMiddleware(Middleware):
 
         # 4. Execute + audit
         start = time.perf_counter()
-        status, error, result = "ok", None, None
+        status: AuditStatus = "ok"
+        error: str | None = None
+        result: Any = None
         try:
             result = await call_next(context)
             return result

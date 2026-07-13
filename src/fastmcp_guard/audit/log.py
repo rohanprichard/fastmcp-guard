@@ -4,7 +4,16 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Any, Literal
+from typing import Any, Literal, Protocol, runtime_checkable
+
+
+@runtime_checkable
+class AuditBackend(Protocol):
+    """Minimal interface an audit backend must implement."""
+
+    async def write(self, record: AuditRecord) -> None:
+        """Persist one audit record."""
+        ...
 
 
 @dataclass
@@ -39,7 +48,7 @@ class AuditRecord:
     client_ip: str | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "ts": self.ts,
             "key_id": self.key_id,
@@ -89,6 +98,7 @@ class AuditLog:
     ) -> None:
         self._log_inputs = log_inputs
         self._log_outputs = log_outputs
+        self._backend: AuditBackend
 
         if backend is None or backend == "file":
             from fastmcp_guard.audit.backends.file import FileBackend
@@ -124,14 +134,16 @@ class AuditLog:
         limit: int = 100,
     ) -> list[AuditRecord]:
         """Query audit records. Only supported by sqlite backend."""
-        if hasattr(self._backend, "query"):
-            return await self._backend.query(
+        query_fn = getattr(self._backend, "query", None)
+        if query_fn is not None:
+            records: list[AuditRecord] = await query_fn(
                 key_id=key_id,
                 key_name=key_name,
                 tool=tool,
                 since=since,
                 limit=limit,
             )
+            return records
         raise NotImplementedError(
             f"The {type(self._backend).__name__} backend does not support querying. "
             "Use the sqlite backend for queryable audit logs."

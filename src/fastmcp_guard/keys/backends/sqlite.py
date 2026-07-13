@@ -4,7 +4,10 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from contextlib import closing
+from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 from fastmcp_guard.keys.models import APIKey
 
@@ -44,7 +47,7 @@ class SQLiteKeyBackend:
         return conn
 
     def _init_db(self) -> None:
-        with self._connect() as conn:
+        with closing(self._connect()) as conn:
             conn.execute(
                 """
                 CREATE TABLE IF NOT EXISTS api_keys (
@@ -72,8 +75,8 @@ class SQLiteKeyBackend:
     # -- serialization -------------------------------------------------------
 
     @staticmethod
-    def _to_row(key: APIKey) -> dict:
-        def iso(dt) -> str | None:
+    def _to_row(key: APIKey) -> dict[str, Any]:
+        def iso(dt: datetime | None) -> str | None:
             return dt.isoformat() if dt else None
 
         status = key.status.value if hasattr(key.status, "value") else key.status
@@ -114,7 +117,7 @@ class SQLiteKeyBackend:
         row = self._to_row(key)
         placeholders = ", ".join("?" for _ in _COLUMNS)
         assignments = ", ".join(f"{c}=excluded.{c}" for c in _COLUMNS if c != "id")
-        with self._connect() as conn:
+        with closing(self._connect()) as conn:
             conn.execute(
                 f"INSERT INTO api_keys ({', '.join(_COLUMNS)}) "
                 f"VALUES ({placeholders}) "
@@ -132,21 +135,21 @@ class SQLiteKeyBackend:
         self._upsert(key)
 
     def get_by_id(self, key_id: str) -> APIKey | None:
-        with self._connect() as conn:
+        with closing(self._connect()) as conn:
             row = conn.execute(
                 "SELECT * FROM api_keys WHERE id = ?", (key_id,)
             ).fetchone()
         return self._from_row(row) if row else None
 
     def get_by_selector(self, selector: str) -> APIKey | None:
-        with self._connect() as conn:
+        with closing(self._connect()) as conn:
             row = conn.execute(
                 "SELECT * FROM api_keys WHERE selector = ?", (selector,)
             ).fetchone()
         return self._from_row(row) if row else None
 
     def all(self) -> list[APIKey]:
-        with self._connect() as conn:
+        with closing(self._connect()) as conn:
             rows = conn.execute(
                 "SELECT * FROM api_keys ORDER BY created_at"
             ).fetchall()

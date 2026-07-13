@@ -32,7 +32,7 @@ def keys_create(
     scopes: str = typer.Option("", "--scopes", "-s", help="Comma-separated scopes"),
     expires_days: int = typer.Option(None, "--expires", help="Expiry in days"),
     db: str = typer.Option("fastmcp-guard-keys.db", "--db", help="SQLite DB path"),
-):
+) -> None:
     """Create a new API key."""
     from fastmcp_guard.keys.store import KeyStore
 
@@ -52,7 +52,7 @@ def keys_create(
 def keys_list(
     db: str = typer.Option("fastmcp-guard-keys.db", "--db", help="SQLite DB path"),
     all_: bool = typer.Option(False, "--all", help="Include revoked keys"),
-):
+) -> None:
     """List API keys."""
     from fastmcp_guard.keys.store import KeyStore
 
@@ -88,7 +88,7 @@ def keys_rotate(
     key_id: str = typer.Argument(..., help="Key ID to rotate"),
     grace_hours: int = typer.Option(24, "--grace", help="Grace period in hours"),
     db: str = typer.Option("fastmcp-guard-keys.db", "--db"),
-):
+) -> None:
     """Rotate an API key. Old key stays valid for the grace period."""
     from fastmcp_guard.keys.store import KeyStore
 
@@ -107,7 +107,7 @@ def keys_revoke(
     key_id: str = typer.Argument(..., help="Key ID to revoke"),
     db: str = typer.Option("fastmcp-guard-keys.db", "--db"),
     force: bool = typer.Option(False, "--force", "-f", help="Skip confirmation"),
-):
+) -> None:
     """Immediately revoke an API key."""
     from fastmcp_guard.keys.store import KeyStore
 
@@ -127,7 +127,7 @@ def keys_revoke(
 def audit_tail(
     db: str = typer.Option("fastmcp-guard-audit.db", "--db"),
     n: int = typer.Option(20, "--lines", "-n", help="Number of recent records to show"),
-):
+) -> None:
     """Show recent audit log entries."""
     import asyncio
 
@@ -162,7 +162,7 @@ def audit_tail(
 # ---------------------------------------------------------------------------
 
 @rate_app.command("status")
-def rate_status():
+def rate_status() -> None:
     """Show global rate limit status."""
     console.print("[dim]Rate limit status requires a running guard instance.[/dim]")
     console.print("Use the Guard.rate_limit.status() method in your server code.")

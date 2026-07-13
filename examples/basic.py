@@ -1,10 +1,11 @@
 """Basic example: API key auth with rate limiting and audit logging."""
 
 from fastmcp import FastMCP
+
 from fastmcp_guard import Guard
+from fastmcp_guard.audit import AuditLog
 from fastmcp_guard.keys import KeyStore
 from fastmcp_guard.rate import RateLimit
-from fastmcp_guard.audit import AuditLog
 
 mcp = FastMCP("my-guarded-server")
 

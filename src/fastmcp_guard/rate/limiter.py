@@ -7,7 +7,7 @@ import re
 import time
 from collections import defaultdict, deque
 from dataclasses import dataclass, field
-from typing import Literal
+from typing import Any, Literal
 
 
 def _parse_rate(rate_str: str) -> tuple[int, int]:
@@ -31,7 +31,7 @@ def _parse_rate(rate_str: str) -> tuple[int, int]:
 @dataclass
 class _Window:
     """Sliding window request tracker for one key."""
-    timestamps: deque = field(default_factory=deque)
+    timestamps: deque[float] = field(default_factory=deque)
 
 
 class RateLimit:
@@ -56,9 +56,13 @@ class RateLimit:
         global_limit: str | None = None,
         backend: Literal["memory", "redis"] = "memory",
     ) -> None:
+        self._per_key_count: int | None
+        self._per_key_window: int | None
         self._per_key_count, self._per_key_window = (
             _parse_rate(per_key) if per_key else (None, None)
         )
+        self._global_count: int | None
+        self._global_window: int | None
         self._global_count, self._global_window = (
             _parse_rate(global_limit) if global_limit else (None, None)
         )
@@ -108,10 +112,10 @@ class RateLimit:
 
             return True
 
-    def status(self, key_id: str) -> dict:
+    def status(self, key_id: str) -> dict[str, Any]:
         """Return rate limit status for a key."""
         now = time.monotonic()
-        result: dict = {}
+        result: dict[str, Any] = {}
 
         if self._per_key_count is not None and self._per_key_window is not None:
             w = self._key_windows.get(key_id, _Window())

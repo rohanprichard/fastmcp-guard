@@ -5,13 +5,14 @@ from __future__ import annotations
 import functools
 import inspect
 from collections.abc import Callable
+from typing import Any
 
 from fastmcp_guard.rate.limiter import _parse_rate
 
 RATE_LIMIT_ATTR = "__fastmcp_guard_rate_limit__"
 
 
-def rate_limit(limit: str) -> Callable:
+def rate_limit(limit: str) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
     """Apply a per-tool rate limit on top of any Guard-level limits.
 
     This decorator marks a tool function with a tighter rate limit. The Guard
@@ -36,18 +37,19 @@ def rate_limit(limit: str) -> Callable:
     """
     _parse_rate(limit)  # validate eagerly; raises ValueError on bad input
 
-    def decorator(fn: Callable) -> Callable:
+    def decorator(fn: Callable[..., Any]) -> Callable[..., Any]:
+        wrapper: Callable[..., Any]
         if inspect.iscoroutinefunction(fn):
 
             @functools.wraps(fn)
-            async def async_wrapper(*args, **kwargs):
+            async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
                 return await fn(*args, **kwargs)
 
-            wrapper: Callable = async_wrapper
+            wrapper = async_wrapper
         else:
 
             @functools.wraps(fn)
-            def sync_wrapper(*args, **kwargs):
+            def sync_wrapper(*args: Any, **kwargs: Any) -> Any:
                 return fn(*args, **kwargs)
 
             wrapper = sync_wrapper
