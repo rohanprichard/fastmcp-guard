@@ -7,7 +7,7 @@ from fastmcp_guard.rate.limiter import RateLimit
 from fastmcp_guard.audit.log import AuditLog
 from fastmcp_guard.ip.policy import IPPolicy
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 __all__ = [
     "Guard",
     "KeyStore",
