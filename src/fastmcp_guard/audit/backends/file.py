@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-import json
 import asyncio
+import json
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -26,6 +26,10 @@ class FileBackend:
         self._lock = asyncio.Lock()
 
     async def write(self, record: AuditRecord) -> None:
+        line = json.dumps(record.to_dict()) + "\n"
         async with self._lock:
-            with self._path.open("a", encoding="utf-8") as f:
-                f.write(json.dumps(record.to_dict()) + "\n")
+            await asyncio.to_thread(self._append, line)
+
+    def _append(self, line: str) -> None:
+        with self._path.open("a", encoding="utf-8") as f:
+            f.write(line)

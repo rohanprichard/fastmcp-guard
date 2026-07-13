@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class KeyStatus(str, Enum):
@@ -16,9 +16,37 @@ class KeyStatus(str, Enum):
     REVOKED = "revoked"
 
 
-def _generate_token() -> str:
-    """Generate a secure API key token with a recognisable prefix."""
-    return f"fmg_sk_{secrets.token_urlsafe(32)}"
+_TOKEN_PREFIX = "fmg_sk_"
+
+
+def _generate_token() -> tuple[str, str]:
+    """Generate a secure API key token and its public lookup selector.
+
+    The token has the form ``fmg_sk_<selector>.<secret>`` where:
+
+    - ``selector`` is a non-secret, indexed handle used to find the one
+      candidate key in O(1) at verification time. ``.`` is not part of the
+      URL-safe base64 alphabet, so it is an unambiguous separator.
+    - ``secret`` is the high-entropy portion that is bcrypt-hashed and never
+      stored in plaintext.
+
+    Returns:
+        ``(token, selector)`` — the full token (shown once) and its selector.
+    """
+    selector = secrets.token_hex(8)
+    secret = secrets.token_urlsafe(32)
+    return f"{_TOKEN_PREFIX}{selector}.{secret}", selector
+
+
+def _selector_of(token: str) -> str | None:
+    """Extract the selector from a raw token, or ``None`` if malformed."""
+    if not token.startswith(_TOKEN_PREFIX):
+        return None
+    body = token[len(_TOKEN_PREFIX) :]
+    selector, sep, secret = body.partition(".")
+    if not sep or not selector or not secret:
+        return None
+    return selector
 
 
 class APIKey(BaseModel):
@@ -40,9 +68,12 @@ class APIKey(BaseModel):
         grace_until: If rotating, when the old key stops being valid.
     """
 
+    model_config = ConfigDict(use_enum_values=True)
+
     id: str = Field(default_factory=lambda: f"fmg_key_{secrets.token_hex(8)}")
     token: str | None = None           # Only populated at creation, then None
     token_hash: str = ""               # bcrypt hash stored in DB
+    selector: str = ""                 # Public, indexed handle for O(1) lookup
     name: str
     scopes: list[str] = Field(default_factory=list)
     status: KeyStatus = KeyStatus.ACTIVE
@@ -61,7 +92,5 @@ class APIKey(BaseModel):
 
     @property
     def is_valid(self) -> bool:
-        return self.status in (KeyStatus.ACTIVE, KeyStatus.ROTATING) and not self.is_expired
-
-    class Config:
-        use_enum_values = True
+        active = self.status in (KeyStatus.ACTIVE, KeyStatus.ROTATING)
+        return active and not self.is_expired

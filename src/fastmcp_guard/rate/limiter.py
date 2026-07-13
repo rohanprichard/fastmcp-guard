@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+import asyncio
 import re
 import time
 from collections import defaultdict, deque
 from dataclasses import dataclass, field
-from typing import Literal
+from typing import Any, Literal
 
 
 def _parse_rate(rate_str: str) -> tuple[int, int]:
@@ -30,7 +31,7 @@ def _parse_rate(rate_str: str) -> tuple[int, int]:
 @dataclass
 class _Window:
     """Sliding window request tracker for one key."""
-    timestamps: deque = field(default_factory=deque)
+    timestamps: deque[float] = field(default_factory=deque)
 
 
 class RateLimit:
@@ -55,9 +56,13 @@ class RateLimit:
         global_limit: str | None = None,
         backend: Literal["memory", "redis"] = "memory",
     ) -> None:
+        self._per_key_count: int | None
+        self._per_key_window: int | None
         self._per_key_count, self._per_key_window = (
             _parse_rate(per_key) if per_key else (None, None)
         )
+        self._global_count: int | None
+        self._global_window: int | None
         self._global_count, self._global_window = (
             _parse_rate(global_limit) if global_limit else (None, None)
         )
@@ -66,6 +71,8 @@ class RateLimit:
         # In-memory state
         self._key_windows: dict[str, _Window] = defaultdict(_Window)
         self._global_window_state = _Window()
+        # Serialize check+record so concurrent requests can't burst past a limit.
+        self._lock = asyncio.Lock()
 
     def _slide(self, window: _Window, window_seconds: int, now: float) -> int:
         """Remove expired entries and return current count."""
@@ -78,29 +85,37 @@ class RateLimit:
         """Check if a request from ``key_id`` is within limits.
 
         Returns ``True`` if allowed, ``False`` if rate-limited.
-        Records the request if allowed.
+        Records the request if allowed. The check and the record are performed
+        atomically under a lock so concurrent callers cannot burst past a limit.
         """
-        now = time.monotonic()
+        async with self._lock:
+            now = time.monotonic()
 
-        if self._per_key_count is not None and self._per_key_window is not None:
-            w = self._key_windows[key_id]
-            count = self._slide(w, self._per_key_window, now)
-            if count >= self._per_key_count:
-                return False
-            w.timestamps.append(now)
+            if self._per_key_count is not None and self._per_key_window is not None:
+                w = self._key_windows[key_id]
+                count = self._slide(w, self._per_key_window, now)
+                if count >= self._per_key_count:
+                    return False
 
-        if self._global_count is not None and self._global_window is not None:
-            count = self._slide(self._global_window_state, self._global_window, now)
-            if count >= self._global_count:
-                return False
-            self._global_window_state.timestamps.append(now)
+            if self._global_count is not None and self._global_window is not None:
+                gcount = self._slide(
+                    self._global_window_state, self._global_window, now
+                )
+                if gcount >= self._global_count:
+                    return False
 
-        return True
+            # Both limits passed — record against each active window.
+            if self._per_key_count is not None and self._per_key_window is not None:
+                self._key_windows[key_id].timestamps.append(now)
+            if self._global_count is not None and self._global_window is not None:
+                self._global_window_state.timestamps.append(now)
 
-    def status(self, key_id: str) -> dict:
+            return True
+
+    def status(self, key_id: str) -> dict[str, Any]:
         """Return rate limit status for a key."""
         now = time.monotonic()
-        result: dict = {}
+        result: dict[str, Any] = {}
 
         if self._per_key_count is not None and self._per_key_window is not None:
             w = self._key_windows.get(key_id, _Window())

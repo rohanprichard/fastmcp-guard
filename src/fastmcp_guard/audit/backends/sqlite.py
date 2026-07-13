@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import sqlite3
+from contextlib import closing
 from datetime import datetime
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from fastmcp_guard.audit.log import AuditRecord
@@ -27,7 +29,7 @@ class SQLiteAuditBackend:
         self._init_db()
 
     def _init_db(self) -> None:
-        with sqlite3.connect(self._path) as conn:
+        with closing(sqlite3.connect(self._path)) as conn:
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS audit_log (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -51,8 +53,11 @@ class SQLiteAuditBackend:
             conn.commit()
 
     async def write(self, record: AuditRecord) -> None:
+        await asyncio.to_thread(self._write_sync, record)
+
+    def _write_sync(self, record: AuditRecord) -> None:
         d = record.to_dict()
-        with sqlite3.connect(self._path) as conn:
+        with closing(sqlite3.connect(self._path)) as conn:
             conn.execute(
                 """
                 INSERT INTO audit_log
@@ -77,10 +82,22 @@ class SQLiteAuditBackend:
         since: datetime | None = None,
         limit: int = 100,
     ) -> list[AuditRecord]:
+        return await asyncio.to_thread(
+            self._query_sync, key_id, key_name, tool, since, limit
+        )
+
+    def _query_sync(
+        self,
+        key_id: str | None = None,
+        key_name: str | None = None,
+        tool: str | None = None,
+        since: datetime | None = None,
+        limit: int = 100,
+    ) -> list[AuditRecord]:
         from fastmcp_guard.audit.log import AuditRecord
 
-        conditions = []
-        params = []
+        conditions: list[str] = []
+        params: list[Any] = []
         if key_id:
             conditions.append("key_id = ?")
             params.append(key_id)
@@ -97,7 +114,7 @@ class SQLiteAuditBackend:
         where = f"WHERE {' AND '.join(conditions)}" if conditions else ""
         params.append(limit)
 
-        with sqlite3.connect(self._path) as conn:
+        with closing(sqlite3.connect(self._path)) as conn:
             conn.row_factory = sqlite3.Row
             rows = conn.execute(
                 f"SELECT * FROM audit_log {where} ORDER BY ts DESC LIMIT ?", params

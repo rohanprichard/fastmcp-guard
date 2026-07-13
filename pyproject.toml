@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "fastmcp-guard"
-version = "0.1.0"
+dynamic = ["version"]
 description = "Production operations layer for FastMCP — API key management, rate limiting, and audit logging"
 readme = "README.md"
 license = { text = "MIT" }
@@ -12,7 +12,7 @@ requires-python = ">=3.10"
 authors = [{ name = "Rohan" }]
 keywords = ["mcp", "fastmcp", "auth", "api-keys", "rate-limiting", "audit", "llm"]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
@@ -28,6 +28,7 @@ dependencies = [
     "typer>=0.12",
     "rich>=13.0",
     "anyio>=4.0",
+    "bcrypt>=4.0",
 ]
 
 [project.optional-dependencies]
@@ -49,10 +50,13 @@ dev = [
 fastmcp-guard = "fastmcp_guard.cli:app"
 
 [project.urls]
-Homepage = "https://github.com/rohan/fastmcp-guard"
-Documentation = "https://fastmcp-guard.readthedocs.io"
-Repository = "https://github.com/rohan/fastmcp-guard"
-Issues = "https://github.com/rohan/fastmcp-guard/issues"
+Homepage = "https://github.com/rohanprichard/fastmcp-guard"
+Documentation = "https://github.com/rohanprichard/fastmcp-guard"
+Repository = "https://github.com/rohanprichard/fastmcp-guard"
+Issues = "https://github.com/rohanprichard/fastmcp-guard/issues"
+
+[tool.hatch.version]
+path = "src/fastmcp_guard/__init__.py"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/fastmcp_guard"]

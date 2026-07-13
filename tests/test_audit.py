@@ -3,10 +3,12 @@
 import json
 import tempfile
 from pathlib import Path
+
 import pytest
-from fastmcp_guard.audit.log import AuditLog, AuditRecord
+
 from fastmcp_guard.audit.backends.file import FileBackend
 from fastmcp_guard.audit.backends.sqlite import SQLiteAuditBackend
+from fastmcp_guard.audit.log import AuditLog, AuditRecord
 
 
 @pytest.mark.asyncio
@@ -54,7 +56,9 @@ async def test_sqlite_backend_write_and_query():
     backend = SQLiteAuditBackend(path)
     await backend.write(AuditRecord(key_name="alice", tool="get_data", status="ok"))
     await backend.write(AuditRecord(key_name="bob", tool="list_files", status="ok"))
-    await backend.write(AuditRecord(key_name="alice", tool="delete_all", status="error"))
+    await backend.write(
+        AuditRecord(key_name="alice", tool="delete_all", status="error")
+    )
 
     all_records = await backend.query(limit=10)
     assert len(all_records) == 3

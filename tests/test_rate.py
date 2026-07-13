@@ -1,7 +1,7 @@
 """Tests for rate limiting."""
 
-import asyncio
 import pytest
+
 from fastmcp_guard.rate.limiter import RateLimit, _parse_rate
 
 

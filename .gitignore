@@ -11,4 +11,8 @@ build/
 htmlcov/
 .mypy_cache/
 .ruff_cache/
+.pytest_cache/
 site/
+
+# demo
+examples/demo/.demo_token

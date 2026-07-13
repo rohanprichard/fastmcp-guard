@@ -1,6 +1,7 @@
 """Example: per-tool rate limits for expensive operations."""
 
 from fastmcp import FastMCP
+
 from fastmcp_guard import Guard
 from fastmcp_guard.rate import RateLimit, rate_limit
 

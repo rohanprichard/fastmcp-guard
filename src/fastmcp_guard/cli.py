@@ -32,7 +32,7 @@ def keys_create(
     scopes: str = typer.Option("", "--scopes", "-s", help="Comma-separated scopes"),
     expires_days: int = typer.Option(None, "--expires", help="Expiry in days"),
     db: str = typer.Option("fastmcp-guard-keys.db", "--db", help="SQLite DB path"),
-):
+) -> None:
     """Create a new API key."""
     from fastmcp_guard.keys.store import KeyStore
 
@@ -40,11 +40,11 @@ def keys_create(
     scope_list = [s.strip() for s in scopes.split(",") if s.strip()]
     key = store.create(name=name, scopes=scope_list, expires_in_days=expires_days)
 
-    console.print(f"\n[bold green]✓ Key created[/bold green]")
+    console.print("\n[bold green]✓ Key created[/bold green]")
     console.print(f"  ID:     [cyan]{key.id}[/cyan]")
     console.print(f"  Name:   [cyan]{key.name}[/cyan]")
     console.print(f"  Scopes: [cyan]{', '.join(key.scopes) or 'none'}[/cyan]")
-    console.print(f"\n  [bold yellow]Token (shown once — save it now!):[/bold yellow]")
+    console.print("\n  [bold yellow]Token (shown once — save it now!):[/bold yellow]")
     console.print(f"  [bold]{key.token}[/bold]\n")
 
 
@@ -52,7 +52,7 @@ def keys_create(
 def keys_list(
     db: str = typer.Option("fastmcp-guard-keys.db", "--db", help="SQLite DB path"),
     all_: bool = typer.Option(False, "--all", help="Include revoked keys"),
-):
+) -> None:
     """List API keys."""
     from fastmcp_guard.keys.store import KeyStore
 
@@ -88,17 +88,17 @@ def keys_rotate(
     key_id: str = typer.Argument(..., help="Key ID to rotate"),
     grace_hours: int = typer.Option(24, "--grace", help="Grace period in hours"),
     db: str = typer.Option("fastmcp-guard-keys.db", "--db"),
-):
+) -> None:
     """Rotate an API key. Old key stays valid for the grace period."""
     from fastmcp_guard.keys.store import KeyStore
 
     store = KeyStore(backend="sqlite", path=db)
     new_key = store.rotate(key_id, grace_period_hours=grace_hours)
 
-    console.print(f"\n[bold green]✓ Key rotated[/bold green]")
+    console.print("\n[bold green]✓ Key rotated[/bold green]")
     console.print(f"  New ID:      [cyan]{new_key.id}[/cyan]")
     console.print(f"  Grace period: {grace_hours}h (old key still valid until then)")
-    console.print(f"\n  [bold yellow]New token (shown once):[/bold yellow]")
+    console.print("\n  [bold yellow]New token (shown once):[/bold yellow]")
     console.print(f"  [bold]{new_key.token}[/bold]\n")
 
 
@@ -107,7 +107,7 @@ def keys_revoke(
     key_id: str = typer.Argument(..., help="Key ID to revoke"),
     db: str = typer.Option("fastmcp-guard-keys.db", "--db"),
     force: bool = typer.Option(False, "--force", "-f", help="Skip confirmation"),
-):
+) -> None:
     """Immediately revoke an API key."""
     from fastmcp_guard.keys.store import KeyStore
 
@@ -127,9 +127,10 @@ def keys_revoke(
 def audit_tail(
     db: str = typer.Option("fastmcp-guard-audit.db", "--db"),
     n: int = typer.Option(20, "--lines", "-n", help="Number of recent records to show"),
-):
+) -> None:
     """Show recent audit log entries."""
     import asyncio
+
     from fastmcp_guard.audit.backends.sqlite import SQLiteAuditBackend
 
     backend = SQLiteAuditBackend(path=db)
@@ -161,7 +162,7 @@ def audit_tail(
 # ---------------------------------------------------------------------------
 
 @rate_app.command("status")
-def rate_status():
+def rate_status() -> None:
     """Show global rate limit status."""
     console.print("[dim]Rate limit status requires a running guard instance.[/dim]")
     console.print("Use the Guard.rate_limit.status() method in your server code.")

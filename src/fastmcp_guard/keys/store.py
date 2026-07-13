@@ -2,26 +2,34 @@
 
 from __future__ import annotations
 
-import secrets
 from datetime import datetime, timedelta, timezone
-from typing import Literal
+from typing import Any, Literal
 
-from fastmcp_guard.keys.models import APIKey, KeyStatus, _generate_token
+from fastmcp_guard.keys.backends.base import KeyBackend
+from fastmcp_guard.keys.models import (
+    APIKey,
+    KeyStatus,
+    _generate_token,
+    _selector_of,
+)
 
 
 class KeyStore:
     """Manages the lifecycle of API keys.
 
     Supports multiple storage backends:
+
     - ``memory``: In-process dict. Fast, no deps, lost on restart. Dev only.
     - ``sqlite``: SQLite database. Persistent, zero-config, single-server.
-    - ``postgres``: PostgreSQL. Multi-server HA deployments.
-    - ``redis``: Redis. High-throughput + integrated rate limiting.
+    - ``postgres`` / ``redis``: planned, not yet implemented.
+
+    Verification is O(1): each token carries a public *selector* used to fetch
+    the single candidate key, which is then checked with one bcrypt comparison.
 
     Args:
         backend: Storage backend to use.
-        path: File path for SQLite backend.
-        dsn: Connection string for Postgres/Redis backends.
+        path: File path for the SQLite backend.
+        dsn: Connection string for Postgres/Redis backends (reserved).
 
     Example:
         ```python
@@ -29,8 +37,7 @@ class KeyStore:
         key = store.create(name="alice", scopes=["read:data"])
         print(key.token)  # fmg_sk_...  (only shown once)
 
-        # Later — verify an incoming token
-        verified = store.verify("fmg_sk_...")
+        verified = store.verify(key.token)
         if verified:
             print(verified.name, verified.scopes)
         ```
@@ -45,46 +52,37 @@ class KeyStore:
         self.backend = backend
         self._path = path
         self._dsn = dsn
+        self._backend = self._init_backend()
 
-        # In-memory store (real backends implemented in subclasses)
-        # Maps token_hash -> APIKey
-        self._store: dict[str, APIKey] = {}
+    def _init_backend(self) -> KeyBackend:
+        if self.backend == "memory":
+            from fastmcp_guard.keys.backends.memory import MemoryKeyBackend
 
-        if backend != "memory":
-            self._init_backend()
-
-    def _init_backend(self) -> None:
-        """Initialise the selected persistent backend."""
+            return MemoryKeyBackend()
         if self.backend == "sqlite":
-            from fastmcp_guard.keys.backends.sqlite import SQLiteBackend
-            self._backend = SQLiteBackend(path=self._path or "fastmcp-guard-keys.db")
-        elif self.backend == "postgres":
-            from fastmcp_guard.keys.backends.postgres import PostgresBackend
-            if not self._dsn:
-                raise ValueError("dsn required for postgres backend")
-            self._backend = PostgresBackend(dsn=self._dsn)
-        elif self.backend == "redis":
-            from fastmcp_guard.keys.backends.redis import RedisBackend
-            if not self._dsn:
-                raise ValueError("dsn required for redis backend")
-            self._backend = RedisBackend(dsn=self._dsn)
+            from fastmcp_guard.keys.backends.sqlite import SQLiteKeyBackend
+
+            return SQLiteKeyBackend(path=self._path or "fastmcp-guard-keys.db")
+        raise NotImplementedError(
+            f"The {self.backend!r} key backend is not implemented yet. "
+            "Use 'memory' or 'sqlite'."
+        )
 
     def create(
         self,
         name: str,
         scopes: list[str] | None = None,
         expires_in_days: int | None = None,
-        metadata: dict | None = None,
+        metadata: dict[str, Any] | None = None,
     ) -> APIKey:
         """Create a new API key.
 
         The ``token`` field is populated on the returned object — this is the
-        ONLY time it is available in plaintext. Store it securely. Subsequent
-        calls to ``get`` or ``list`` will NOT return the token.
+        ONLY time it is available in plaintext. Store it securely.
 
         Args:
             name: Human-readable label for the key.
-            scopes: OAuth-style scopes. Defaults to ``[]`` (no access).
+            scopes: OAuth-style scopes. Defaults to ``[]``.
             expires_in_days: Optional expiry in days from now.
             metadata: Arbitrary metadata dict attached to the key.
 
@@ -93,13 +91,14 @@ class KeyStore:
         """
         import bcrypt
 
-        token = _generate_token()
+        token, selector = _generate_token()
         token_hash = bcrypt.hashpw(token.encode(), bcrypt.gensalt()).decode()
 
         key = APIKey(
             name=name,
             token=token,
             token_hash=token_hash,
+            selector=selector,
             scopes=scopes or [],
             metadata=metadata or {},
             expires_at=(
@@ -109,40 +108,58 @@ class KeyStore:
             ),
         )
 
-        self._store[token_hash] = key
+        self._backend.add(key)
         return key
 
     def verify(self, token: str) -> APIKey | None:
         """Verify a raw token and return the matching APIKey, or None.
 
-        Updates ``last_used_at`` on successful verification.
+        O(1): the token's selector fetches a single candidate, which is then
+        checked with one bcrypt comparison. Rotating keys whose grace period
+        has elapsed are finalized (revoked) lazily here.
 
         Args:
             token: The raw ``fmg_sk_...`` token from the Authorization header.
 
         Returns:
-            The matching ``APIKey`` if valid, else ``None``.
+            The matching ``APIKey`` (token stripped) if valid, else ``None``.
         """
         import bcrypt
 
-        for key in self._store.values():
-            if not key.is_valid:
-                continue
-            try:
-                if bcrypt.checkpw(token.encode(), key.token_hash.encode()):
-                    key.last_used_at = datetime.now(timezone.utc)
-                    return key
-            except Exception:
-                continue
-        return None
+        selector = _selector_of(token)
+        if selector is None:
+            return None
+
+        key = self._backend.get_by_selector(selector)
+        if key is None:
+            return None
+
+        # Finalize an elapsed grace period before validity checks.
+        if (
+            key.status == KeyStatus.ROTATING
+            and key.grace_until is not None
+            and datetime.now(timezone.utc) > key.grace_until
+        ):
+            key.status = KeyStatus.REVOKED
+            self._backend.update(key)
+
+        if not key.is_valid:
+            return None
+
+        try:
+            if not bcrypt.checkpw(token.encode(), key.token_hash.encode()):
+                return None
+        except (ValueError, TypeError):
+            return None
+
+        key.last_used_at = datetime.now(timezone.utc)
+        self._backend.update(key)
+        return key.model_copy(update={"token": None})
 
     def get(self, key_id: str) -> APIKey | None:
         """Get a key by ID (token not included)."""
-        for key in self._store.values():
-            if key.id == key_id:
-                masked = key.model_copy(update={"token": None})
-                return masked
-        return None
+        key = self._backend.get_by_id(key_id)
+        return key.model_copy(update={"token": None}) if key else None
 
     def list(self, include_revoked: bool = False) -> list[APIKey]:
         """List all keys (tokens not included).
@@ -150,16 +167,12 @@ class KeyStore:
         Args:
             include_revoked: Include revoked keys in the result.
         """
-        keys = [k.model_copy(update={"token": None}) for k in self._store.values()]
+        keys = [k.model_copy(update={"token": None}) for k in self._backend.all()]
         if not include_revoked:
             keys = [k for k in keys if k.status != KeyStatus.REVOKED]
         return sorted(keys, key=lambda k: k.created_at)
 
-    def rotate(
-        self,
-        key_id: str,
-        grace_period_hours: int = 24,
-    ) -> APIKey:
+    def rotate(self, key_id: str, grace_period_hours: int = 24) -> APIKey:
         """Rotate a key. Returns a new key; old key stays valid for the grace period.
 
         Args:
@@ -174,31 +187,25 @@ class KeyStore:
             KeyError: If the key is not found.
             ValueError: If the key is already revoked.
         """
-        old_key = self.get(key_id)
+        old_key = self._backend.get_by_id(key_id)
         if old_key is None:
             raise KeyError(f"Key not found: {key_id}")
         if old_key.status == KeyStatus.REVOKED:
             raise ValueError(f"Cannot rotate a revoked key: {key_id}")
 
-        # Mark old key as rotating with grace period
-        for key in self._store.values():
-            if key.id == key_id:
-                key.status = KeyStatus.ROTATING
-                key.grace_until = datetime.now(timezone.utc) + timedelta(hours=grace_period_hours)
-                break
+        old_key.status = KeyStatus.ROTATING
+        old_key.grace_until = datetime.now(timezone.utc) + timedelta(
+            hours=grace_period_hours
+        )
+        self._backend.update(old_key)
 
-        # Create new key with same settings
         new_key = self.create(
             name=old_key.name,
             scopes=old_key.scopes,
             metadata=old_key.metadata,
         )
-        # Track lineage
-        for key in self._store.values():
-            if key.id == new_key.id:
-                key.rotated_from = key_id
-                break
-
+        new_key.rotated_from = key_id
+        self._backend.update(new_key)
         return new_key
 
     def revoke(self, key_id: str) -> None:
@@ -210,15 +217,24 @@ class KeyStore:
         Raises:
             KeyError: If the key is not found.
         """
-        for key in self._store.values():
-            if key.id == key_id:
-                key.status = KeyStatus.REVOKED
-                return
-        raise KeyError(f"Key not found: {key_id}")
+        key = self._backend.get_by_id(key_id)
+        if key is None:
+            raise KeyError(f"Key not found: {key_id}")
+        key.status = KeyStatus.REVOKED
+        self._backend.update(key)
 
     def _expire_grace_periods(self) -> None:
-        """Called periodically to finalize expired rotating keys."""
+        """Finalize all rotating keys whose grace period has elapsed.
+
+        Verification also does this lazily; this method exists for an optional
+        periodic sweep.
+        """
         now = datetime.now(timezone.utc)
-        for key in self._store.values():
-            if key.status == KeyStatus.ROTATING and key.grace_until and now > key.grace_until:
+        for key in self._backend.all():
+            if (
+                key.status == KeyStatus.ROTATING
+                and key.grace_until
+                and now > key.grace_until
+            ):
                 key.status = KeyStatus.REVOKED
+                self._backend.update(key)
