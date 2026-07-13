@@ -33,12 +33,25 @@ _ANON = "anonymous"
 
 
 def _output_preview(result: Any, limit: int = 200) -> str | None:
-    """Best-effort short string preview of a tool result."""
+    """Best-effort short *text* preview of a tool result.
+
+    FastMCP tool results expose ``.content`` as a list of content blocks
+    (e.g. ``TextContent``); we pull the ``.text`` out of those rather than
+    logging their repr, falling back to ``str`` for anything else.
+    """
     if result is None:
         return None
     try:
-        text = getattr(result, "content", None)
-        rendered = str(text if text is not None else result)
+        content = getattr(result, "content", None)
+        if content is None:
+            rendered = str(result)
+        elif isinstance(content, (list, tuple)):
+            parts = [
+                getattr(block, "text", None) or str(block) for block in content
+            ]
+            rendered = " ".join(parts)
+        else:
+            rendered = str(getattr(content, "text", None) or content)
     except Exception:
         return None
     return rendered[:limit]
