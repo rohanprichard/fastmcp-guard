@@ -1,8 +1,9 @@
 """Tests for API key lifecycle."""
 
 import pytest
-from fastmcp_guard.keys.store import KeyStore
+
 from fastmcp_guard.keys.models import KeyStatus
+from fastmcp_guard.keys.store import KeyStore
 
 
 @pytest.fixture

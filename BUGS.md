@@ -1,21 +1,30 @@
 # fastmcp-guard Bug Report
 
-This document catalogs all bugs and vulnerabilities discovered during code review and testing.
+This document catalogs bugs and vulnerabilities discovered during code review
+and testing.
+
+**Status update (v0.2): all bugs below are FIXED and covered by tests.** See
+`tests/` — in particular `test_store_backends.py`, `test_middleware.py`, and
+`test_http_integration.py`, which exercise the full path over both in-memory and
+real HTTP transports.
 
 ## Summary Table
 
-| ID | Severity | Status | Description |
-|----|----------|--------|-------------|
-| BUG-001 | CRITICAL | Open | SQLite/Postgres/Redis key backends not implemented |
-| BUG-002 | CRITICAL | Open | Audit logging is completely non-functional (never writes) |
-| BUG-003 | CRITICAL | Open | IP policy is never enforced |
-| BUG-004 | HIGH | Open | @rate_limit decorator is a no-op |
-| BUG-005 | HIGH | Open | Grace period keys never expire (no background task) |
-| BUG-006 | SECURITY | Open | O(n) bcrypt verification = DoS amplification |
-| BUG-007 | SECURITY | Open | Race condition in rate limiter (check+append not atomic) |
-| BUG-008 | BUG | Open | @rate_limit decorator breaks sync tool functions |
-| BUG-009 | BUG | Open | Synchronous I/O blocks the event loop |
-| BUG-010 | BUG | Open | bcrypt missing from pyproject.toml dependencies |
+| ID | Severity | Status | Description | Fix |
+|----|----------|--------|-------------|-----|
+| BUG-001 | CRITICAL | ✅ Fixed | SQLite key backend not implemented | Implemented `SQLiteKeyBackend`; Postgres/Redis explicitly `NotImplementedError` |
+| BUG-002 | CRITICAL | ✅ Fixed | Audit logging never writes | `GuardMiddleware.on_call_tool` writes an `AuditRecord` per call |
+| BUG-003 | CRITICAL | ✅ Fixed | IP policy never enforced | Middleware checks client IP from the HTTP request |
+| BUG-004 | HIGH | ✅ Fixed | `@rate_limit` decorator is a no-op | Middleware reads the marker and enforces a per-(key,tool) limit |
+| BUG-005 | HIGH | ✅ Fixed | Grace-period keys never expire | Rotating keys past grace are revoked lazily on `verify` |
+| BUG-006 | SECURITY | ✅ Fixed | O(n) bcrypt = DoS amplification | Token selector → O(1) lookup + a single bcrypt check |
+| BUG-007 | SECURITY | ✅ Fixed | Rate limiter check+append race | `asyncio.Lock` makes check+record atomic |
+| BUG-008 | BUG | ✅ Fixed | Decorator breaks sync tools | Decorator branches on `iscoroutinefunction` |
+| BUG-009 | BUG | ✅ Fixed | Sync I/O blocks the event loop | File/SQLite audit writes use `asyncio.to_thread` |
+| BUG-010 | BUG | ✅ Fixed | `bcrypt` missing from dependencies | Added `bcrypt>=4.0` to `pyproject.toml` |
+
+*The per-bug detail sections below describe the original defects (kept for
+history); each is now resolved as summarized above.*
 
 ---
 

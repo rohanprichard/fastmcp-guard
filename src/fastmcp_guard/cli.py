@@ -40,11 +40,11 @@ def keys_create(
     scope_list = [s.strip() for s in scopes.split(",") if s.strip()]
     key = store.create(name=name, scopes=scope_list, expires_in_days=expires_days)
 
-    console.print(f"\n[bold green]✓ Key created[/bold green]")
+    console.print("\n[bold green]✓ Key created[/bold green]")
     console.print(f"  ID:     [cyan]{key.id}[/cyan]")
     console.print(f"  Name:   [cyan]{key.name}[/cyan]")
     console.print(f"  Scopes: [cyan]{', '.join(key.scopes) or 'none'}[/cyan]")
-    console.print(f"\n  [bold yellow]Token (shown once — save it now!):[/bold yellow]")
+    console.print("\n  [bold yellow]Token (shown once — save it now!):[/bold yellow]")
     console.print(f"  [bold]{key.token}[/bold]\n")
 
 
@@ -95,10 +95,10 @@ def keys_rotate(
     store = KeyStore(backend="sqlite", path=db)
     new_key = store.rotate(key_id, grace_period_hours=grace_hours)
 
-    console.print(f"\n[bold green]✓ Key rotated[/bold green]")
+    console.print("\n[bold green]✓ Key rotated[/bold green]")
     console.print(f"  New ID:      [cyan]{new_key.id}[/cyan]")
     console.print(f"  Grace period: {grace_hours}h (old key still valid until then)")
-    console.print(f"\n  [bold yellow]New token (shown once):[/bold yellow]")
+    console.print("\n  [bold yellow]New token (shown once):[/bold yellow]")
     console.print(f"  [bold]{new_key.token}[/bold]\n")
 
 
@@ -130,6 +130,7 @@ def audit_tail(
 ):
     """Show recent audit log entries."""
     import asyncio
+
     from fastmcp_guard.audit.backends.sqlite import SQLiteAuditBackend
 
     backend = SQLiteAuditBackend(path=db)

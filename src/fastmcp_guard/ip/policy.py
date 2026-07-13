@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import ipaddress
-from typing import Sequence
+from collections.abc import Sequence
 
 
 class IPPolicy:
@@ -54,8 +54,4 @@ class IPPolicy:
             return True
 
         # Check allowlist
-        for net in self._allow:
-            if addr in net:
-                return True
-
-        return False
+        return any(addr in net for net in self._allow)

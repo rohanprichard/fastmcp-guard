@@ -2,6 +2,14 @@
 
 > Production operations layer for FastMCP servers.
 
+!!! note "Beta (v0.2)"
+    fastmcp-guard is functional and covered by tests, including end-to-end tests
+    over a real HTTP server. **Working today:** API keys (memory + SQLite),
+    Bearer-token auth, per-key/global/per-tool rate limiting, audit logging
+    (`file`/`sqlite`/`http`), IP allow/deny enforcement, and the CLI.
+    **Planned:** Postgres/Redis backends, OTel audit export, distributed rate
+    limiting. Suitable for single-server deployments.
+
 `fastmcp-guard` gives your [FastMCP](https://github.com/jlowin/fastmcp) server the operational tooling it needs to run in production:
 
 - **API key management** — issue, rotate, and revoke keys without redeploying
@@ -11,17 +19,17 @@
 
 ## Why not just use FastMCP's built-in auth?
 
-FastMCP ships with solid auth *primitives* — `JWTVerifier`, `OAuthProxy`, `require_scopes`. These handle the *protocol* layer (validating tokens against a JWKS endpoint, enforcing scopes).
+FastMCP ships with solid auth *primitives* — `JWTVerifier`, `OAuthProxy`, `require_scopes` — and, since 2.9, a native middleware pipeline with built-in rate limiting and logging. These handle the *protocol* and *throttling* layers.
 
-`fastmcp-guard` handles the *operations* layer on top:
+`fastmcp-guard` focuses on the *key-lifecycle and identity* layer that FastMCP does not ship:
 
 | Question | FastMCP | fastmcp-guard |
 |----------|---------|---------------|
 | Is this JWT valid? | ✅ `JWTVerifier` | — |
-| Who has access? (issue/revoke keys) | ❌ | ✅ |
-| How often is Alice calling `run_analysis`? | ❌ | ✅ |
-| Is someone hammering the server? | ❌ | ✅ |
-| Who called what, when, from where? | ❌ | ✅ |
+| Is someone hammering the server? | ✅ `RateLimitingMiddleware` (2.9+) | adds per-key limits |
+| Who has access? (issue/rotate/revoke keys) | ❌ | ✅ |
+| How often is Alice calling `run_analysis`? | ❌ | 🚧 planned |
+| Who called what, when, from where? | ❌ | 🚧 planned (audit) |
 
 Think of FastMCP's auth as the lock; `fastmcp-guard` as the key management office.
 

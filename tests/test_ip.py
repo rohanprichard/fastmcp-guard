@@ -1,6 +1,5 @@
 """Tests for IP policy."""
 
-import pytest
 from fastmcp_guard.ip.policy import IPPolicy
 
 

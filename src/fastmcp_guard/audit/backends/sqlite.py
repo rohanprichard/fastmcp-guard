@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import sqlite3
 from datetime import datetime
@@ -51,6 +52,9 @@ class SQLiteAuditBackend:
             conn.commit()
 
     async def write(self, record: AuditRecord) -> None:
+        await asyncio.to_thread(self._write_sync, record)
+
+    def _write_sync(self, record: AuditRecord) -> None:
         d = record.to_dict()
         with sqlite3.connect(self._path) as conn:
             conn.execute(
@@ -70,6 +74,18 @@ class SQLiteAuditBackend:
             conn.commit()
 
     async def query(
+        self,
+        key_id: str | None = None,
+        key_name: str | None = None,
+        tool: str | None = None,
+        since: datetime | None = None,
+        limit: int = 100,
+    ) -> list[AuditRecord]:
+        return await asyncio.to_thread(
+            self._query_sync, key_id, key_name, tool, since, limit
+        )
+
+    def _query_sync(
         self,
         key_id: str | None = None,
         key_name: str | None = None,
