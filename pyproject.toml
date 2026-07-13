@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "fastmcp-guard"
-version = "0.2.0"
+dynamic = ["version"]
 description = "Production operations layer for FastMCP — API key management, rate limiting, and audit logging"
 readme = "README.md"
 license = { text = "MIT" }
@@ -54,6 +54,9 @@ Homepage = "https://github.com/rohanprichard/fastmcp-guard"
 Documentation = "https://github.com/rohanprichard/fastmcp-guard"
 Repository = "https://github.com/rohanprichard/fastmcp-guard"
 Issues = "https://github.com/rohanprichard/fastmcp-guard/issues"
+
+[tool.hatch.version]
+path = "src/fastmcp_guard/__init__.py"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/fastmcp_guard"]

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from typing import TYPE_CHECKING
 
 from fastmcp.server.auth import AccessToken, TokenVerifier
@@ -29,8 +30,14 @@ class KeyStoreVerifier(TokenVerifier):
         self._key_store = key_store
 
     async def verify_token(self, token: str) -> AccessToken | None:
-        """Return an ``AccessToken`` for a valid token, else ``None``."""
-        key = self._key_store.verify(token)
+        """Return an ``AccessToken`` for a valid token, else ``None``.
+
+        ``KeyStore.verify`` is synchronous and does blocking work — a store
+        lookup plus a bcrypt comparison (CPU-bound, tens of milliseconds). We run
+        it in a worker thread so it never blocks the event loop; bcrypt releases
+        the GIL while hashing, so concurrent verifications run in parallel.
+        """
+        key = await asyncio.to_thread(self._key_store.verify, token)
         if key is None:
             return None
         return AccessToken(
