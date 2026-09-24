@@ -5,6 +5,7 @@
 [![PyPI](https://img.shields.io/pypi/v/fastmcp-guard)](https://pypi.org/project/fastmcp-guard/)
 [![Python](https://img.shields.io/pypi/pyversions/fastmcp-guard)](https://pypi.org/project/fastmcp-guard/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![PyPI Downloads](https://static.pepy.tech/personalized-badge/fastmcp-guard?period=total&units=INTERNATIONAL_SYSTEM&left_color=BLACK&right_color=GREEN&left_text=downloads)](https://pepy.tech/projects/fastmcp-guard)
 
 ## Status
 
