@@ -51,9 +51,10 @@ fastmcp-guard = "fastmcp_guard.cli:app"
 
 [project.urls]
 Homepage = "https://github.com/rohanprichard/fastmcp-guard"
-Documentation = "https://github.com/rohanprichard/fastmcp-guard"
+Documentation = "https://github.com/rohanprichard/fastmcp-guard/tree/main/docs"
 Repository = "https://github.com/rohanprichard/fastmcp-guard"
 Issues = "https://github.com/rohanprichard/fastmcp-guard/issues"
+Author = "https://rohanprichard.com"
 
 [tool.hatch.version]
 path = "src/fastmcp_guard/__init__.py"
