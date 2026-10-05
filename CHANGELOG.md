@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.2
+
+### Changed
+- Package metadata: full author name and email, a docs link, and an author link.
+  No code changes.
+
 ## 0.2.1
 
 ### Changed
